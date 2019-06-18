@@ -10,6 +10,7 @@ type Group struct {
 type StartRequest struct {
 	PrevailingWind int
 	LianZhuang     int
+	Riichi         [4]bool
 }
 
 type Request struct {
@@ -27,12 +28,12 @@ type Response struct {
 		ReplacementTileCount int
 		WallCount            int
 		Player               [4]struct {
-			HandTile []Tile
-			NowTile  Tile
-			PaiHe    []Tile
-			TingPai  int
-			Riichi   int
-			Groups   []Group `json:"Group"`
+			HandTile    []Tile
+			NowTile     Tile
+			DiscardTile []Tile
+			ReadHand    int
+			Riichi      int
+			Groups      []Group `json:"Group"`
 		}
 	}
 	Action struct {

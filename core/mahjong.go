@@ -7,10 +7,10 @@ func NewMahjong() *Mahjong {
 	return &Mahjong{}
 }
 
-func (m *Mahjong) Start(request string) (response string, err error) {
-	return "", nil
+func (m *Mahjong) Start(request *StartRequest) (response *Response, err error) {
+	return nil, nil
 }
 
-func (m *Mahjong) Next(request string) (response string, err error) {
-	return "", nil
+func (m *Mahjong) Next(request *Request) (response *Response, err error) {
+	return nil, nil
 }
