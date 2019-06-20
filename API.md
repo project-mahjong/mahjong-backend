@@ -99,7 +99,7 @@ Error 值表示后端是否遇到了致命错误，若值为 0 ，表示没有�
 ```plain
 {
 	"PrevailingWind": <int>, // 当前局场风：整数 0~3 分别表示东、南、西、北风场
-	"LianZhuang": <int>,  //当前局的连庄次数  
+	"RemainingDealer": <int>,  //当前局的连庄次数  
     "Riichi": <bool>[4] //玩家的点数是否足够立直(按东南西北家顺序给出)
 }
 ```
