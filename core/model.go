@@ -8,9 +8,9 @@ type Group struct {
 	CallingTile Tile
 }
 type StartRequest struct {
-	PrevailingWind int
-	LianZhuang     int
-	Riichi         [4]bool
+	PrevailingWind  int
+	RemainingDealer int
+	Riichi          [4]bool
 }
 
 type Request struct {
@@ -39,7 +39,7 @@ type Response struct {
 }
 
 type ResponseActionPlayer struct {
-	ID int
+	ID         int
 	CanDiscard []bool
 	Groups     []Group `json:"Group"`
 }

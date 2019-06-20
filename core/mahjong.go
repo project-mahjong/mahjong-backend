@@ -9,7 +9,7 @@ import (
 
 type Mahjong struct {
 	prevailingWind   int
-	lianZhuang       int
+	remainingDealer  int
 	wall             [136]Tile
 	wallCount        int
 	doraCount        int
@@ -70,8 +70,9 @@ func (m *Mahjong) Start(request *StartRequest) (response *ResponseAction, err er
 	if request.PrevailingWind < 0 || request.PrevailingWind >= 4 {
 		return nil, &InvalidValueError{"PrevailingWind invalid"}
 	}
+
 	m.prevailingWind = request.PrevailingWind
-	m.lianZhuang = request.LianZhuang
+	m.remainingDealer = request.RemainingDealer
 	for i := 0; i < 4; i++ {
 		m.player[i].scoreCanRiichi = request.Riichi[i]
 	}

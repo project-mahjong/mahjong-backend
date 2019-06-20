@@ -13,7 +13,7 @@ func main() {
 	m := core.NewMahjong()
 	cin := bufio.NewReader(os.Stdin)
 	requestString, _, err := cin.ReadLine()
-	//requestString=[]byte(`{"PrevailingWind":0,"LianZhuang":0,"Riichi":[true,true,true,true]}`)
+	//requestString=[]byte(`{"PrevailingWind":0,"RemainingDealer":0,"Riichi":[true,true,true,true]}`)
 	err = nil
 	if err != nil {
 		log.Panic("unable to read stdin")
