@@ -13,6 +13,8 @@ func main() {
 	m := core.NewMahjong()
 	cin := bufio.NewReader(os.Stdin)
 	requestString, _, err := cin.ReadLine()
+	requestString=[]byte(`{"PrevailingWind":0,"LianZhuang":0,"Riichi":[true,true,true,true]}`)
+	err=nil
 	if err != nil {
 		log.Panic("unable to read stdin")
 	}
@@ -27,7 +29,12 @@ func main() {
 		fmt.Println(`{"Error":-1,"ErrorString":"Unknown error."}`)
 		return
 	}
-	fmt.Println(json.Marshal(response))
+	data,err:=json.Marshal(response)
+	if err != nil {
+		fmt.Println(`{"Error":-1,"ErrorString":"Unknown error."}`)
+		return
+	}
+	fmt.Println(string(data))
 	for {
 		requestString, _, err := cin.ReadLine()
 		if err != nil {

@@ -22,7 +22,7 @@ type Response struct {
 	Error       int
 	ErrorString string
 	Title       struct {
-		Wall                 Tile
+		Wall                 [136]Tile
 		MD5                  string
 		DoraIndicatorCount   int
 		ReplacementTileCount int
@@ -36,13 +36,24 @@ type Response struct {
 			Groups      []Group `json:"Group"`
 		}
 	}
+}
+
+type ResponseActionPlayer struct {
+	ID int
+	CanDiscard []bool
+	Groups     []Group `json:"Group"`
+}
+
+type ResponseAction struct {
+	Response
 	Action struct {
 		Type   int
-		Player []struct {
-			CanDiscard []bool
-			Groups     []Group `json:"Group"`
-		}
+		Player []ResponseActionPlayer
 	}
+}
+
+type ResponseEnd struct {
+	Response
 	End struct {
 		Player [4]struct {
 			IsWin      int
