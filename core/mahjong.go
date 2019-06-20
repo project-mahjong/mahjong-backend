@@ -3,25 +3,60 @@ package core
 import (
 	"crypto/md5"
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 )
 
+var ID2Tile [136]Tile
+
+func init() {
+	cnt := 0
+	for k := 1; k <= 3; k++ {
+		for i := 1; i <= 9; i++ {
+			for j := 1; j <= 4; j++ {
+				t := i
+				if i == 5 && j == 1 {
+					t = 0
+				}
+				if k == 1 {
+					ID2Tile[cnt] = Tile(strconv.Itoa(t) + "m")
+				} else if k == 2 {
+					ID2Tile[cnt] = Tile(strconv.Itoa(t) + "p")
+				} else if k == 3 {
+					ID2Tile[cnt] = Tile(strconv.Itoa(t) + "s")
+				}
+				cnt++
+			}
+		}
+	}
+	for i := 1; i <= 7; i++ {
+		for j := 1; j <= 4; j++ {
+			ID2Tile[cnt] = Tile(strconv.Itoa(i) + "z")
+			cnt++
+		}
+	}
+	for i := 0; i < 136; i++ {
+		fmt.Print(ID2Tile[i])
+	}
+}
+
 type Mahjong struct {
 	prevailingWind   int
 	remainingDealer  int
-	wall             [136]Tile
+	wall             [136]int
 	wallCount        int
 	doraCount        int
 	ReplacementCount int
 	md5              string
 	player           [4]Player
+	turnTo           int // 当前应谁出牌
+	lastActionType   int
 }
 
 type Player struct {
-	handTile       []Tile
-	nowTile        Tile
-	discardTile    []Tile
+	handTile       []int
+	discardTile    []int
 	discardTo      []int // 表示舍牌到哪里去了
 	scoreCanRiichi bool
 	riichiTile     int // 立直宣言牌为舍牌的第几张,未立直则为-1
@@ -70,6 +105,9 @@ func (m *Mahjong) Start(request *StartRequest) (response *ResponseAction, err er
 	if request.PrevailingWind < 0 || request.PrevailingWind >= 4 {
 		return nil, &InvalidValueError{"PrevailingWind invalid"}
 	}
+	if request.RemainingDealer < 0 || request.RemainingDealer >= 4 {
+		return nil, &InvalidValueError{"RemainingDealer invalid"}
+	}
 
 	m.prevailingWind = request.PrevailingWind
 	m.remainingDealer = request.RemainingDealer
@@ -90,39 +128,91 @@ func (m *Mahjong) Start(request *StartRequest) (response *ResponseAction, err er
 	return response, nil
 }
 
-func (m *Mahjong) Next(request *Request) (response *interface{}, err error) {
-	return nil, nil
+func (m *Mahjong) Next(request *Request) (response interface{}, err error) {
+	if m.lastActionType == 0 {
+		if request.Discard < 0 || request.Discard >= len(m.player[m.turnTo].handTile) {
+			return nil, &InvalidValueError{"Discard invalid"}
+		}
+		nowPlayer := &m.player[m.turnTo]
+		tile := nowPlayer.handTile[request.Discard]
+		removeInt(&nowPlayer.handTile, request.Discard)
+		appendInt(&nowPlayer.discardTile, tile)
+		appendInt(&nowPlayer.discardTo, m.turnTo)
+
+		if m.wallCount >= 136 {
+			res := &ResponseEnd{Response: *m.getTitle()}
+			cnt := 0
+			for i := 0; i < 4; i++ {
+				if m.player[i].isReadHand() != 0 {
+					cnt++
+				}
+			}
+			for i := 0; i < 4; i++ {
+				res.End.Player[i].IsWin = m.player[i].isReadHand()
+				if m.player[i].isReadHand() == 0 {
+					switch cnt {
+					case 0:
+						res.End.Player[i].Score = 0
+					case 1:
+						res.End.Player[i].Score = -1000
+					case 2:
+						res.End.Player[i].Score = -1500
+					case 3:
+						res.End.Player[i].Score = -3000
+					}
+				} else {
+					switch cnt {
+					case 1:
+						res.End.Player[i].Score = 3000
+					case 2:
+						res.End.Player[i].Score = 1500
+					case 3:
+						res.End.Player[i].Score = 1000
+					case 4:
+						res.End.Player[i].Score = 0
+					}
+				}
+			}
+			return res, nil
+		}
+		m.turnTo++
+		if m.turnTo >= 4 {
+			m.turnTo = 0
+		}
+		nowPlayer = &m.player[m.turnTo]
+		appendInt(&nowPlayer.handTile, m.wall[m.wallCount])
+		m.wallCount++
+		res := &ResponseAction{Response: *m.getTitle()}
+		res.Error = 0
+		res.ErrorString = ""
+		res.Action.Type = 0
+		canDiscard := make([]bool, 14)
+		for i := 0; i < 14; i++ {
+			canDiscard[i] = true
+		}
+		res.Action.Player = make([]ResponseActionPlayer, 1)
+		res.Action.Player[0].CanDiscard = canDiscard
+		res.Action.Player[0].ID = m.turnTo
+		response = res
+		return response, nil
+	} else if m.lastActionType == 1 {
+		//TODO: 吃碰杠处理
+	} else if m.lastActionType == 2 {
+		//TODO: 和牌处理
+	} else if m.lastActionType == 3 {
+		//TODO: 九种九牌处理
+	} else if m.lastActionType == 4 {
+		//TODO: 立直处理
+	}
+	log.Panic("lastActionType invalid")
+	return nil, &UnknownError{}
 }
 
 func (m *Mahjong) initWall() {
-	cnt := 0
-	for i := 1; i <= 7; i++ {
-		for j := 1; j <= 4; j++ {
-			m.wall[cnt] = Tile(strconv.Itoa(i) + "z")
-			cnt++
-		}
-	}
-	for i := 1; i <= 9; i++ {
-		for j := 1; j <= 4; j++ {
-			t := i
-			if i == 5 && j == 4 {
-				t = 0
-			}
-			m.wall[cnt] = Tile(strconv.Itoa(t) + "m")
-			cnt++
-			m.wall[cnt] = Tile(strconv.Itoa(t) + "s")
-			cnt++
-			m.wall[cnt] = Tile(strconv.Itoa(t) + "p")
-			cnt++
-		}
-	}
-	for i := len(m.wall) - 1; i > 0; i-- {
-		t := rand.Intn(i + 1)
-		m.wall[i], m.wall[t] = m.wall[t], m.wall[i]
-	}
+	copy(m.wall[:], rand.Perm(136))
 	data := ""
 	for i := 53; i < 136; i++ {
-		data += string(m.wall[i])
+		data += string(ID2Tile[m.wall[i]])
 	}
 	m.md5 = fmt.Sprintf("%x", md5.Sum([]byte(data)))
 }
@@ -143,18 +233,22 @@ func (m *Mahjong) takeTile() {
 
 func (m *Mahjong) getTitle() (response *Response) {
 	response = &Response{}
-	response.Title.Wall = m.wall
+	for i := range m.wall {
+		response.Title.Wall[i] = ID2Tile[m.wall[i]]
+	}
 	response.Title.MD5 = m.md5
 	response.Title.WallCount = m.wallCount
 	response.Title.DoraIndicatorCount = m.doraCount
 	response.Title.ReplacementTileCount = m.ReplacementCount
 	for i := 0; i < 4; i++ {
-		response.Title.Player[i].HandTile = m.player[i].handTile
-		response.Title.Player[i].NowTile = m.player[i].nowTile
+		for _, v := range m.player[i].handTile {
+			response.Title.Player[i].HandTile = append(response.Title.Player[i].HandTile, ID2Tile[v])
+		}
+		response.Title.Player[i].NowTile = Tile("")
 		river := make([]Tile, 0)
 		for j := 0; j < len(m.player[i].discardTile); j++ {
 			if m.player[i].discardTo[j] == i {
-				river = append(river, m.player[i].discardTile[j])
+				river = append(river, ID2Tile[m.player[i].discardTile[j]])
 			}
 		}
 		response.Title.Player[i].DiscardTile = river
@@ -178,13 +272,21 @@ func (m *Mahjong) getTitle() (response *Response) {
 				response.Title.Player[i].Riichi = cnt
 			}
 		}
-		response.Title.Player[i].Groups = m.player[i].group
+		for _, v := range m.player[i].group {
+			t := GroupResponse{}
+			t.Type = v.Type
+			t.CallingTile = ID2Tile[v.CallingTile]
+			for _, v2 := range v.Tiles {
+				t.Tiles = append(t.Tiles, ID2Tile[v2])
+			}
+			response.Title.Player[i].Groups = append(response.Title.Player[i].Groups, t)
+		}
 	}
 	return response
 }
 
 func (p *Player) init() {
-	p.discardTile = make([]Tile, 0)
+	p.discardTile = make([]int, 0)
 	p.discardTo = make([]int, 0)
 	p.riichiTile = -1
 	p.group = make([]Group, 0)

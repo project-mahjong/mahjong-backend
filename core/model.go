@@ -4,7 +4,13 @@ type Tile string
 type Group struct {
 	Type        int
 	From        int
-	BaseTile    Tile
+	Tiles       []int
+	CallingTile int
+}
+type GroupResponse struct {
+	Type        int
+	From        int
+	Tiles       []Tile `json:"Tile"`
 	CallingTile Tile
 }
 type StartRequest struct {
@@ -33,7 +39,7 @@ type Response struct {
 			DiscardTile []Tile
 			ReadHand    int
 			Riichi      int
-			Groups      []Group `json:"Group"`
+			Groups      []GroupResponse `json:"Group"`
 		}
 	}
 }
@@ -41,7 +47,7 @@ type Response struct {
 type ResponseActionPlayer struct {
 	ID         int
 	CanDiscard []bool
-	Groups     []Group `json:"Group"`
+	Groups     []GroupResponse `json:"Group"`
 }
 
 type ResponseAction struct {
