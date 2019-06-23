@@ -21,7 +21,7 @@ func main() {
 	request := &core.StartRequest{}
 	err = json.Unmarshal(requestString, request)
 	if err != nil {
-		fmt.Println(core.JsonError{})
+		fmt.Println(core.NewJsonError(""))
 		return
 	}
 	response, err := m.Start(request)
@@ -31,31 +31,33 @@ func main() {
 	}
 	data, err := json.Marshal(response)
 	if err != nil {
-		fmt.Println(core.UnknownError{})
+		fmt.Println(core.NewUnknownError("Unexpected error while marshaling json."))
 		return
 	}
 	fmt.Println(string(data))
 	for {
 		requestString, _, err := cin.ReadLine()
-		requestString = []byte(`{"Discard":5}`)
-		err = nil
+		if err != nil || string(requestString) == "" {
+			requestString = []byte(`[{"Discard":5}]`)
+			err = nil
+		}
 		if err != nil {
 			log.Panic("unable to read stdin")
 		}
-		request := &core.Request{}
-		err = json.Unmarshal(requestString, request)
+		var request []core.Request
+		err = json.Unmarshal(requestString, &request)
 		if err != nil {
-			fmt.Println(core.JsonError{})
+			fmt.Println(core.NewJsonError(""))
 			return
 		}
 		response, err := m.Next(request)
 		if err != nil {
-			fmt.Println(core.UnknownError{})
+			fmt.Println(core.NewUnknownError("Unknown error in main progress."))
 			return
 		}
 		data, err := json.Marshal(response)
 		if err != nil {
-			fmt.Println(core.UnknownError{})
+			fmt.Println(core.NewUnknownError("Unexpected error while marshaling json."))
 			return
 		}
 		fmt.Println(string(data))
