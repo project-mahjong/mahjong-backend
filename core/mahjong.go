@@ -143,6 +143,7 @@ func (m *Mahjong) Start(request *StartRequest) (response *ResponseAction, err er
 }
 
 func (m *Mahjong) Next(request []Request) (response interface{}, err error) {
+	nowPlayer := &m.player[m.turnTo]
 	if m.lastActionType == 0 {
 		if len(request) != 1 {
 			return nil, &InvalidValueError{"array size not equal to 1"}
@@ -151,7 +152,6 @@ func (m *Mahjong) Next(request []Request) (response interface{}, err error) {
 		if discard < 0 || discard >= len(m.player[m.turnTo].handTile) {
 			return nil, &InvalidValueError{"Discard invalid"}
 		}
-		nowPlayer := &m.player[m.turnTo]
 		tile := nowPlayer.handTile[discard]
 		m.lastTile = tile
 		removeInt(&nowPlayer.handTile, discard)
@@ -184,7 +184,6 @@ func (m *Mahjong) Next(request []Request) (response interface{}, err error) {
 		//TODO: 吃碰杠处理
 		return response, nil
 	} else if m.lastActionType == 2 {
-		//TODO: 和牌处理
 		if len(request) != len(m.winList) {
 			return nil, &InvalidValueError{}
 		}
@@ -214,7 +213,7 @@ func (m *Mahjong) Next(request []Request) (response interface{}, err error) {
 					res.End.Player[i].Score = 1      //TODO: 计算点数
 				} else {
 					res.End.Player[i].IsWin = 0
-					if i == m.turnTo { //放统选手
+					if i == m.turnTo { //放铳选手
 						res.End.Player[i].Score = -1 //TODO: 计算点数
 					} else {
 						res.End.Player[i].Score = 0
@@ -230,11 +229,78 @@ func (m *Mahjong) Next(request []Request) (response interface{}, err error) {
 	} else if m.lastActionType == 4 {
 		//TODO: 立直处理
 		return response, nil
+	} else if m.lastActionType == 5 {
+		if len(request) != 1 {
+			return nil, &InvalidValueError{"array size not equal to 1"}
+		}
+		if request[0].OK {
+			// 和了，终局！
+			res := &ResponseEnd{Response: *m.getTitle()}
+			_, yaku := checkWin(m.player[m.turnTo].handTile, m.player[m.turnTo].group)
+			res.End.Player[m.turnTo].Yaku = yaku
+			minipoints := 5 //TODO: 符数计算
+			score := 10     //TODO: 得点计算
+			if m.turnTo == 0 {
+				score += score / 2
+			}
+			res.End.Player[m.turnTo].Minipoints = minipoints
+			res.End.Player[m.turnTo].Score = score
+			res.End.Player[m.turnTo].IsWin = 2
+			if m.turnTo == 0 {
+				score /= 3
+			} else {
+				score /= 4
+			}
+			for i := 0; i < 4; i++ {
+				if i != m.turnTo {
+					res.End.Player[i].IsWin = 0
+					if i == 0 {
+						res.End.Player[i].Score = -score * 2
+					} else {
+						res.End.Player[i].Score = -score
+					}
+					res.End.Player[i].Minipoints = 0
+					res.End.Player[i].Yaku = nil
+				}
+			}
+			return res, nil
+		} else {
+			// 居然不和
+			res := &ResponseAction{Response: *m.getTitle()}
+			res.Error = 0
+			res.ErrorString = ""
+			m.lastActionType = 0
+			res.Action.Type = 0
+			canDiscard := make([]bool, len(nowPlayer.handTile))
+			for i := range canDiscard {
+				canDiscard[i] = true
+			}
+			res.Action.Player = make([]ResponseActionPlayer, 1)
+			res.Action.Player[0].CanDiscard = canDiscard
+			res.Action.Player[0].ID = m.turnTo
+			return res, nil
+		}
 	} else {
 		log.Panic("lastActionType invalid")
 		return nil, &UnknownError{}
 	}
-	if m.wallCount >= 136 {
+
+	handTile := make([]int, len(nowPlayer.handTile)+1)
+	copy(handTile, nowPlayer.handTile)
+	appendInt(&handTile, m.lastTile)
+	if ok, _ := checkWin(handTile, nowPlayer.group); ok {
+		// 可以自摸
+		res := &ResponseAction{Response: *m.getTitle()}
+		res.Error = 0
+		res.ErrorString = ""
+		m.lastActionType = 5
+		res.Action.Type = 5
+		res.Action.Player = make([]ResponseActionPlayer, 1)
+		res.Action.Player[0].ID = m.turnTo
+		return res, nil
+	}
+
+	if m.wallCount >= 136 { //荒牌流局
 		res := &ResponseEnd{Response: *m.getTitle()}
 		cnt := 0
 		for i := 0; i < 4; i++ {
@@ -270,19 +336,20 @@ func (m *Mahjong) Next(request []Request) (response interface{}, err error) {
 		}
 		return res, nil
 	}
+
 	m.turnTo++
 	if m.turnTo >= 4 {
 		m.turnTo = 0
 	}
-	nowPlayer := &m.player[m.turnTo]
+	nowPlayer = &m.player[m.turnTo]
 	appendInt(&nowPlayer.handTile, m.wall[m.wallCount])
 	m.wallCount++
 	res := &ResponseAction{Response: *m.getTitle()}
 	res.Error = 0
 	res.ErrorString = ""
 	res.Action.Type = 0
-	canDiscard := make([]bool, 14)
-	for i := 0; i < 14; i++ {
+	canDiscard := make([]bool, len(nowPlayer.handTile))
+	for i := range canDiscard {
 		canDiscard[i] = true
 	}
 	res.Action.Player = make([]ResponseActionPlayer, 1)
@@ -387,6 +454,7 @@ func (p *Player) isReadHand() int {
 // ok: 是否能和牌
 // yaku: 满足的役种表（不包括宝牌，赤宝牌，里宝牌），有和牌型但无役为空slice，不能和牌则为nil
 func checkWin(handTile []int, groups []Group) (ok bool, yaku []int) {
+	yaku = make([]int, 0)
 	if checkSevenPairs(handTile, groups) {
 		appendInt(&yaku, 200)
 	} else if checkKokushimusou(handTile, groups) {
