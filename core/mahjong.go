@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sort"
 	"strconv"
 )
 
@@ -35,9 +36,6 @@ func init() {
 			ID2Tile[cnt] = Tile(strconv.Itoa(i) + "z")
 			cnt++
 		}
-	}
-	for i := 0; i < 136; i++ {
-		fmt.Print(ID2Tile[i])
 	}
 }
 
@@ -146,7 +144,7 @@ func (m *Mahjong) Next(request []Request) (response interface{}, err error) {
 	nowPlayer := &m.player[m.turnTo]
 	if m.lastActionType == 0 {
 		if len(request) != 1 {
-			return nil, &InvalidValueError{"array size not equal to 1"}
+			return nil, &InvalidValueError{"Array size not equal to 1"}
 		}
 		discard := request[0].Discard
 		if discard < 0 || discard >= len(m.player[m.turnTo].handTile) {
@@ -453,13 +451,14 @@ func (p *Player) isReadHand() int {
 // 检查玩家是否可以和牌
 // ok: 是否能和牌
 // yaku: 满足的役种表（不包括宝牌，赤宝牌，里宝牌），有和牌型但无役为空slice，不能和牌则为nil
-func checkWin(handTile []int, groups []Group) (ok bool, yaku []int) {
+func checkWin(handTile []int, group []Group) (ok bool, yaku []int) {
+	sort.Ints(handTile)
 	yaku = make([]int, 0)
-	if checkSevenPairs(handTile, groups) {
+	if checkSevenPairs(handTile, group) {
 		appendInt(&yaku, 200)
-	} else if checkKokushimusou(handTile, groups) {
+	} else if checkKokushimusou(handTile, group) {
 		appendInt(&yaku, 800)
-	} else if !checkNormalWin(handTile, groups) {
+	} else if !checkNormalWin(handTile, 4-len(group), 1) {
 		// 没和牌牌型，告辞
 		return false, nil
 	}
@@ -467,17 +466,96 @@ func checkWin(handTile []int, groups []Group) (ok bool, yaku []int) {
 	return true, yaku
 }
 
-func checkSevenPairs(handTile []int, groups []Group) bool {
-	//TODO: 七对子检查
-	return false
+// 七对子型检查
+func checkSevenPairs(handTile []int, group []Group) bool {
+	if len(group) > 0 {
+		return false
+	}
+	tong := make(map[int]int)
+	for _, i := range handTile {
+		tong[i/4]++
+	}
+	for _, i := range tong {
+		if i != 2 {
+			return false
+		}
+	}
+	return true
 }
 
-func checkKokushimusou(handTile []int, groups []Group) bool {
-	//TODO: 国士无双检查
-	return false
+// 国士无双型检查
+func checkKokushimusou(handTile []int, group []Group) bool {
+	if len(group) > 0 {
+		return false
+	}
+	flag := make([]bool, 13)
+	for _, i := range handTile {
+		switch i / 4 {
+		case 0:
+			flag[0] = true
+		case 8:
+			flag[1] = true
+		case 9:
+			flag[2] = true
+		case 17:
+			flag[3] = true
+		case 18:
+			flag[4] = true
+		case 26:
+			flag[5] = true
+		default:
+			if i/4 >= 27 {
+				flag[i/4-21] = true
+			} else {
+				return false
+			}
+		}
+	}
+	for _, i := range flag {
+		if !i {
+			return false
+		}
+	}
+	return true
 }
 
-func checkNormalWin(handTile []int, groups []Group) bool {
-	//TODO: 普通和牌型检查
+// 普通和牌型检查（递归函数）
+// m: 还需要找出几组面子
+func checkNormalWin(handTile []int, m int, q int) bool {
+	if len(handTile) != q*2+m*3 {
+		log.Panic("handTile size unexpected")
+	}
+	if m == 0 && q == 0 {
+		return true
+	}
+	if m > 0 && handTile[0]/4 == handTile[1]/4 && handTile[0]/4 == handTile[2]/4 && checkNormalWin(handTile[3:], m-1, q) {
+		return true
+	}
+	if q == 1 && handTile[0]/4 == handTile[1]/4 && checkNormalWin(handTile[2:], m, 0) {
+		return true
+	}
+	if m == 0 {
+		return false
+	}
+	now := handTile[0] / 4
+	if now >= 25 || now == 7 || now == 8 || now == 16 || now == 17 {
+		return false
+	}
+	for i := 1; i < len(handTile); i++ {
+		if handTile[i]/4 == now+1 {
+			for j := i + 1; j < len(handTile); j++ {
+				if handTile[j]/4 == now+2 {
+					t := make([]int, 0)
+					for k := 1; k < len(handTile); k++ {
+						if k != i && k != j {
+							appendInt(&t, handTile[k])
+						}
+					}
+					return checkNormalWin(t, m-1, q)
+				}
+			}
+			return false
+		}
+	}
 	return false
 }
